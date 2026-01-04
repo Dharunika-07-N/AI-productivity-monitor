@@ -1,0 +1,83 @@
+{
+  "categorization_rules": {
+    "productive": [
+      {
+        "app": "code.exe",
+        "site": null
+      },
+      {
+        "app": "chrome.exe",
+        "site": "github.com"
+      },
+      {
+        "app": "pycharm.exe",
+        "site": null
+      },
+      {
+        "app": "chrome.exe",
+        "site": "stackoverflow.com"
+      },
+      {
+        "app": "chrome.exe",
+        "site": "docs.python.org"
+      },
+      {
+        "app": "chrome.exe",
+        "site": "developer.mozilla.org"
+      }
+    ],
+    "neutral": [
+      {
+        "app": "explorer.exe",
+        "site": null
+      },
+      {
+        "app": "cmd.exe",
+        "site": null
+      },
+      {
+        "app": "powershell.exe",
+        "site": null
+      }
+    ],
+    "time_wasting": [
+      {
+        "app": "chrome.exe",
+        "site": "youtube.com"
+      },
+      {
+        "app": "chrome.exe",
+        "site": "instagram.com"
+      },
+      {
+        "app": "chrome.exe",
+        "site": "facebook.com"
+      },
+      {
+        "app": "chrome.exe",
+        "site": "twitter.com"
+      },
+      {
+        "app": "chrome.exe",
+        "site": "tiktok.com"
+      },
+      {
+        "app": "chrome.exe",
+        "site": "netflix.com"
+      }
+    ]
+  },
+  "nudge_settings": {
+    "min_streak_for_nudge": 2700,
+    "nudge_cooldown_minutes": 30,
+    "nudge_message": "💡 Focus Check\n\nYou were productive for {streak_time}.\nWant to keep this streak and share progress later?"
+  },
+  "github_settings": {
+    "productive_threshold_minutes": 60,
+    "min_commits_for_motivation": 1
+  },
+  "tracking_settings": {
+    "check_interval_seconds": 1,
+    "session_timeout_minutes": 5
+  }
+}

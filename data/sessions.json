@@ -1,0 +1,34 @@
+[
+  {
+    "start_time": "2026-01-04T23:07:37.347708",
+    "end_time": "2026-01-04T23:07:46.366003",
+    "duration": 9.018295,
+    "app": "Code.exe",
+    "title": "reporter.py - Time_waste_detector - Visual Studio Code",
+    "site": null
+  },
+  {
+    "start_time": "2026-01-04T23:07:46.366003",
+    "end_time": "2026-01-04T23:07:52.715501",
+    "duration": 6.349498,
+    "app": "WhatsApp.Root.exe",
+    "title": "WhatsApp",
+    "site": null
+  },
+  {
+    "start_time": "2026-01-04T23:07:52.715501",
+    "end_time": "2026-01-04T23:07:54.720173",
+    "duration": 2.004672,
+    "app": "Code.exe",
+    "title": "reporter.py - Time_waste_detector - Visual Studio Code",
+    "site": null
+  },
+  {
+    "start_time": "2026-01-04T23:07:54.720173",
+    "end_time": "2026-01-04T23:08:00.976240",
+    "duration": 6.256067,
+    "app": "ChatGPT.exe",
+    "title": "15-Day Mini Project Plan",
+    "site": null
+  }
+]
