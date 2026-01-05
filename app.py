@@ -3,6 +3,8 @@ import sqlite3
 from datetime import datetime, timedelta
 import collections
 import json
+from focus_scorer import get_calculator
+from nudge_engine import get_nudge_engine
 
 app = Flask(__name__)
 DB_PATH = 'activity.db'
@@ -95,15 +97,14 @@ def current_activity():
 
 @app.route('/api/user-progress')
 def user_progress():
-    conn = get_db_connection()
-    query = "SELECT count(*) as count FROM activity WHERE category = 'productive'"
-    result = conn.execute(query).fetchone()
-    productive_ticks = result['count'] if result else 0
-    total_xp = productive_ticks * 10 
+    calculator = get_calculator()
+    stats = calculator.get_productivity_stats()
+    productive_minutes = stats['productive']['minutes']
+    total_xp = productive_minutes * 10 
     
-    conn.close()
-
     level = int(total_xp / 1000) + 1
+    
+    comparison = calculator.get_score_comparison()
     
     return jsonify({
         'level': level,
@@ -111,8 +112,10 @@ def user_progress():
         'nextLevelXP': 1000,
         'totalXP': total_xp,
         'title': 'Focus Novice' if level < 5 else 'Focus Master',
-        'streak': 1, 
-        'longestStreak': 1
+        'streak': 1, # TODO: Get real streak from analyzer
+        'longestStreak': 1,
+        'focusScore': comparison['today'],
+        'scoreComparison': comparison
     })
 
 @app.route('/api/today-breakdown')
@@ -131,11 +134,20 @@ def today_breakdown():
     
     stats = {'productive': 0, 'neutral': 0, 'distracting': 0}
     
+    # Load interval from config if possible
+    interval = 1
+    try:
+        with open(CONFIG_PATH, 'r') as f:
+            config = json.load(f)
+            interval = config.get('tracking_settings', {}).get('check_interval_seconds', 1)
+    except:
+        pass
+
     for row in rows:
         cat = normalize_category(row['category'])
         count = row['count']
         if cat in stats:
-            stats[cat] += calculate_duration_minutes(count, 1)
+            stats[cat] += calculate_duration_minutes(count, interval)
 
     stats['total'] = stats['productive'] + stats['neutral'] + stats['distracting']
     return jsonify(stats)
@@ -177,7 +189,7 @@ def recent_activities():
         
         if not current_session or current_session['name'] != app_name:
             if current_session:
-                current_session['duration'] = calculate_duration_str(current_session['count'], interval)
+                current_session['duration'] = calculate_duration_minutes(current_session['count'], interval)
                 temp_activities.append(current_session)
             
             current_session = {
@@ -192,76 +204,80 @@ def recent_activities():
             current_session['count'] += 1
     
     if current_session:
-        current_session['duration'] = calculate_duration_str(current_session['count'], interval)
+        current_session['duration'] = calculate_duration_minutes(current_session['count'], interval)
         temp_activities.append(current_session)
 
     return jsonify(temp_activities[:8])
 
 @app.route('/api/trends/weekly')
 def weekly_trends():
-    conn = get_db_connection()
-    today = datetime.now()
-    week_stats = []
+    calculator = get_calculator()
+    trend = calculator.get_score_trend(7)
     
-    for i in range(6, -1, -1):
-        day = today - timedelta(days=i)
-        day_str = day.strftime('%a') 
-        start_day = day.replace(hour=0, minute=0, second=0).isoformat()
-        end_day = day.replace(hour=23, minute=59, second=59).isoformat()
-        
-        query = """
-        SELECT category, COUNT(*) as count 
-        FROM activity 
-        WHERE timestamp BETWEEN ? AND ?
-        GROUP BY category
-        """
-        rows = conn.execute(query, (start_day, end_day)).fetchall()
-        
-        day_data = {
-            'date': day_str,
-            'productiveMinutes': 0,
+    # Map to frontend format
+    formatted_trend = []
+    for day in trend:
+        formatted_trend.append({
+            'date': day['day_name'],
+            'focusScore': day['score'],
+            # These are for the stacked area chart
+            'productiveMinutes': 0, # Could be added if we expand calculator
             'neutralMinutes': 0,
-            'distractingMinutes': 0,
-            'focusScore': 0,
-            'focusSessions': 0
-        }
-        
-        total_mins = 0
-        prod_mins = 0
-        
-        for row in rows:
-            cat = normalize_category(row['category'])
-            mins = calculate_duration_minutes(row['count'], 1)
-            
-            if cat == 'productive': 
-                day_data['productiveMinutes'] += mins
-                prod_mins += mins
-            elif cat == 'neutral': 
-                day_data['neutralMinutes'] += mins
-            elif cat == 'distracting': 
-                day_data['distractingMinutes'] += mins
-            
-            total_mins += mins
-            
-        if total_mins > 0:
-            day_data['focusScore'] = int((prod_mins / total_mins) * 100)
-            
-        week_stats.append(day_data)
-        
-    conn.close()
-    return jsonify(week_stats)
+            'distractingMinutes': 0
+        })
+    
+    return jsonify(formatted_trend)
 
 @app.route('/api/nudges')
 def get_nudges():
-    return jsonify([
-        {'id': '1', 'type': 'tip', 'title': 'Welcome', 'message': 'Start working to see your stats!', 'timestamp': datetime.now().isoformat(), 'acknowledged': False}
-    ])
+    engine = get_nudge_engine()
+    nudges = engine.generate_nudges()
+    
+    # Add unique IDs for frontend
+    for i, nudge in enumerate(nudges):
+        nudge['id'] = str(i + 1)
+        nudge['acknowledged'] = False
+        
+    return jsonify(nudges)
 
 @app.route('/api/goals')
 def get_goals():
-    return jsonify([
-        {'id': '1', 'title': 'Daily Productive Time', 'type': 'daily', 'targetMinutes': 300, 'currentMinutes': 0, 'category': 'productive'}
-    ])
+    calculator = get_calculator()
+    stats = calculator.get_productivity_stats()
+    
+    productive_mins = stats['productive']['minutes']
+    distracting_mins = stats['time_wasting']['minutes']
+    
+    goals = [
+        {
+            'id': '1', 
+            'title': 'Deep Work Master', 
+            'type': 'daily', 
+            'targetMinutes': 120, 
+            'currentMinutes': productive_mins, 
+            'category': 'productive',
+            'icon': 'Zap'
+        },
+        {
+            'id': '2', 
+            'title': 'Focus Sprint', 
+            'type': 'daily', 
+            'targetMinutes': 30, 
+            'currentMinutes': min(30, productive_mins), 
+            'category': 'productive',
+            'icon': 'Target'
+        },
+        {
+            'id': '3', 
+            'title': 'Distraction Free', 
+            'type': 'daily', 
+            'targetMinutes': 60, 
+            'currentMinutes': max(0, 60 - distracting_mins), 
+            'category': 'neutral',
+            'icon': 'Shield'
+        }
+    ]
+    return jsonify(goals)
 
 # New endpoint for top apps
 @app.route('/api/stats/top-apps')
