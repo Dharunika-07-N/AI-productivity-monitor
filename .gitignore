@@ -1,3 +1,6 @@
 __pycache__/
 *.pyc
-.env
+activity.db
+data/
+*.log
+.DS_Store
