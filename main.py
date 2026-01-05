@@ -1,145 +1,80 @@
-#!/usr/bin/env python3
-"""
-AI Time-Wasting Pattern Detector
-Main entry point for the productivity monitoring system.
-"""
-
 import time
-import signal
-import sys
-from datetime import datetime, date
-from tracker import WindowTracker
-from analyzer import FocusAnalyzer
-from nudger import SocialPressureNudger
-from github_motivator import GitHubMotivator
-from reporter import DailyReporter
+import json
+import sqlite3
+import psutil
+import win32gui
+import win32process
+from datetime import datetime
 
-class TimeWasteDetector:
-    def __init__(self):
-        print("🧠 Initializing AI Time-Wasting Pattern Detector...")
-        self.tracker = WindowTracker()
-        self.analyzer = FocusAnalyzer()
-        self.nudger = SocialPressureNudger()
-        self.github_motivator = GitHubMotivator()
-        self.reporter = DailyReporter()
-        self.running = True
-        self.last_analysis_time = time.time()
-        self.last_report_date = date.today()
+CONFIG_PATH = 'config.json'
+DB_PATH = 'activity.db'
 
-        # Set up signal handlers for graceful shutdown
-        signal.signal(signal.SIGINT, self.signal_handler)
-        signal.signal(signal.SIGTERM, self.signal_handler)
+def load_config():
+    with open(CONFIG_PATH, 'r') as f:
+        return json.load(f)
 
-        print("✅ System initialized. Starting monitoring...")
+def init_db():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS activity 
+                 (timestamp TEXT, app_name TEXT, window_title TEXT, category TEXT)''')
+    conn.commit()
+    conn.close()
 
-    def signal_handler(self, signum, frame):
-        """Handle shutdown signals gracefully."""
-        print("\n🛑 Shutdown signal received. Saving data and exiting...")
-        self.running = False
+def get_active_window_info():
+    try:
+        hwnd = win32gui.GetForegroundWindow()
+        _, pid = win32process.GetWindowThreadProcessId(hwnd)
+        process = psutil.Process(pid)
+        app_name = process.name().lower()
+        window_title = win32gui.GetWindowText(hwnd)
+        return app_name, window_title
+    except Exception:
+        return None, None
 
-    def run(self):
-        """Main monitoring loop."""
-        check_interval = 1  # seconds
+def categorize_activity(app_name, window_title, config):
+    rules = config.get('categorization_rules', {})
+    
+    # Check specific rules
+    for category, items in rules.items():
+        for item in items:
+            if item['app'] == app_name:
+                if item['site']:
+                    # Check if the site keyword is in the window title (e.g., "YouTube" in "YouTube - Chrome")
+                    if item['site'].lower() in window_title.lower():
+                        return category
+                else:
+                    # If no site is specified, the app itself defines the category
+                    return category
+    
+    return "neutral"
 
-        while self.running:
-            try:
-                # Track current window
-                current_session = self.tracker.get_current_session()
-
-                # Analyze every 10 seconds to avoid excessive processing
-                current_time = time.time()
-                if current_time - self.last_analysis_time >= 10:
-                    self.perform_analysis()
-                    self.last_analysis_time = current_time
-
-                # Check for daily report generation
-                today = date.today()
-                if today != self.last_report_date:
-                    self.generate_daily_report()
-                    self.last_report_date = today
-
-                # Sleep for check interval
-                time.sleep(check_interval)
-
-            except KeyboardInterrupt:
-                break
-            except Exception as e:
-                print(f"❌ Error in main loop: {e}")
-                time.sleep(check_interval)
-
-        # Final cleanup
-        self.cleanup()
-
-    def perform_analysis(self):
-        """Perform periodic analysis of user activity."""
-        try:
-            # Get today's sessions
-            sessions = self.tracker.get_today_sessions()
-
-            if not sessions:
-                return
-
-            # Analyze sessions for streaks and distractions
-            streaks_data = self.analyzer.analyze_sessions(sessions)
-
-            # Check if we should show a nudge
-            if self.analyzer.should_nudge(streaks_data):
-                # Get GitHub motivation data
-                github_data = self.github_motivator.get_motivation_data()
-
-                # Show nudge
-                if self.nudger.show_nudge(streaks_data['current_streak'], github_data):
-                    self.analyzer.record_nudge()
-
-            # Check for motivation nudge
-            productive_time = streaks_data.get('current_streak', 0)
-            if self.github_motivator.is_eligible_for_update(productive_time / 3600 * 60):  # Convert to minutes
-                github_data = self.github_motivator.get_motivation_data()
-                self.nudger.show_motivation_nudge(github_data, productive_time)
-
-        except Exception as e:
-            print(f"❌ Error in analysis: {e}")
-
-    def generate_daily_report(self):
-        """Generate end-of-day productivity report."""
-        try:
-            print("📊 Generating daily productivity report...")
-
-            # Get today's sessions
-            sessions = self.tracker.get_today_sessions()
-
-            if sessions:
-                # Generate report
-                report = self.reporter.generate_daily_report(sessions)
-
-                # Show notification with summary
-                self.nudger.show_daily_report_notification(report['summary'])
-
-                print("✅ Daily report generated and notification sent.")
-            else:
-                print("ℹ️ No sessions recorded today.")
-
-        except Exception as e:
-            print(f"❌ Error generating daily report: {e}")
-
-    def cleanup(self):
-        """Perform cleanup operations before shutdown."""
-        try:
-            print("💾 Saving final data...")
-            # Any final data saving can go here
-            print("👋 AI Time-Wasting Pattern Detector stopped.")
-        except Exception as e:
-            print(f"❌ Error during cleanup: {e}")
+def log_activity(app_name, window_title, category):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    timestamp = datetime.now().isoformat()
+    c.execute("INSERT INTO activity VALUES (?, ?, ?, ?)", 
+              (timestamp, app_name, window_title, category))
+    conn.commit()
+    conn.close()
 
 def main():
-    """Main entry point."""
-    print("🧠 AI Time-Wasting Pattern Detector")
-    print("===================================")
-    print("This system monitors your activity to help build better productivity habits.")
-    print("All data stays local on your machine. Press Ctrl+C to stop.\n")
-
-    detector = TimeWasteDetector()
-    detector.run()
+    print("Starting AI Time-Wasting Detector...")
+    init_db()
+    config = load_config()
+    check_interval = config['tracking_settings']['check_interval_seconds']
+    
+    print(f"Tracking every {check_interval} seconds. Press Ctrl+C to stop.")
+    
+    while True:
+        app_name, window_title = get_active_window_info()
+        if app_name:
+            category = categorize_activity(app_name, window_title, config)
+            # Print to console for immediate feedback
+            print(f"[{category.upper()}] {app_name} - {window_title[:50]}")
+            log_activity(app_name, window_title, category)
+        
+        time.sleep(check_interval)
 
 if __name__ == "__main__":
     main()

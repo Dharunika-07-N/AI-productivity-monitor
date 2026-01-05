@@ -1,129 +1,30 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🧠 AI Time-Wasting Pattern Detector</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link href="/static/css/style.css" rel="stylesheet">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- TODO: Set the document title to the name of your application -->
+  <title>FocusFlow</title>
+  <meta name="description" content="FocusFlow - Productivity Tracker" />
+  <meta name="author" content="Mindflow Guard" />
+
+  <!-- TODO: Update og:title to match your application name -->
+  <meta property="og:title" content="FocusFlow" />
+  <meta property="og:description" content="FocusFlow - Productivity Tracker" />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="/static/logo.png" />
+
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:site" content="@FocusFlow" />
+  <meta name="twitter:image" content="/static/logo.png" />
+  <script type="module" crossorigin src="/assets/index-DvJ-6ZGw.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-BQ4vKqCW.css">
 </head>
+
 <body>
-    <nav class="navbar navbar-dark bg-primary">
-        <div class="container-fluid">
-            <span class="navbar-brand mb-0 h1">
-                <i class="fas fa-brain"></i> AI Time-Wasting Pattern Detector
-            </span>
-            <div class="d-flex">
-                <button id="startBtn" class="btn btn-success me-2">
-                    <i class="fas fa-play"></i> Start Monitoring
-                </button>
-                <button id="stopBtn" class="btn btn-danger me-2" disabled>
-                    <i class="fas fa-stop"></i> Stop Monitoring
-                </button>
-                <button id="reportBtn" class="btn btn-info">
-                    <i class="fas fa-chart-bar"></i> Generate Report
-                </button>
-            </div>
-        </div>
-    </nav>
+  <div id="root"></div>
 
-    <div class="container-fluid mt-4">
-        <div class="row">
-            <!-- Current Session -->
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-header">
-                        <h5><i class="fas fa-desktop"></i> Current Session</h5>
-                    </div>
-                    <div class="card-body">
-                        <div id="currentSession">
-                            <p class="text-muted">Not monitoring</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Today's Stats -->
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-header">
-                        <h5><i class="fas fa-chart-pie"></i> Today's Statistics</h5>
-                    </div>
-                    <div class="card-body">
-                        <canvas id="statsChart" width="300" height="300"></canvas>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Focus Streak -->
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-header">
-                        <h5><i class="fas fa-fire"></i> Focus Streak</h5>
-                    </div>
-                    <div class="card-body">
-                        <div id="streakInfo">
-                            <h2 id="currentStreak" class="text-primary">0m</h2>
-                            <p class="mb-1">Current: <span id="currentStreakText">0 minutes</span></p>
-                            <p class="mb-1">Longest Today: <span id="longestStreak">0 minutes</span></p>
-                            <p class="mb-0">Distractions Prevented: <span id="distractions">0</span></p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="row mt-4">
-            <!-- GitHub Activity -->
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header">
-                        <h5><i class="fab fa-github"></i> GitHub Activity</h5>
-                    </div>
-                    <div class="card-body">
-                        <div id="githubActivity">
-                            <p>Commits Today: <span id="commitsToday">0</span></p>
-                            <p>Active Repositories: <span id="activeRepos">0</span></p>
-                            <p>Last Commit: <span id="lastCommit">None</span></p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Recent Sessions -->
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header">
-                        <h5><i class="fas fa-history"></i> Recent Sessions</h5>
-                    </div>
-                    <div class="card-body">
-                        <div id="recentSessions" style="max-height: 300px; overflow-y: auto;">
-                            <p class="text-muted">No sessions recorded</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Daily Report Modal -->
-        <div class="modal fade" id="reportModal" tabindex="-1">
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title"><i class="fas fa-chart-bar"></i> Daily Productivity Report</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body" id="reportContent">
-                        <p>Loading report...</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="/static/js/dashboard.js"></script>
 </body>
+
 </html>
