@@ -38,10 +38,20 @@ def get_icon_for_app(app_name):
     if 'mail' in app_name or 'outlook' in app_name: return 'Mail'
     return 'AppWindow'
 
+def calculate_duration_str(count, interval_seconds=1):
+    if count == 0: return "0s"
+    total_seconds = int(count * interval_seconds)
+    if total_seconds < 60:
+        return f"{total_seconds}s"
+    minutes = total_seconds // 60
+    seconds = total_seconds % 60
+    if seconds == 0:
+        return f"{minutes}m"
+    return f"{minutes}m {seconds}s"
+
 def calculate_duration_minutes(count, interval_seconds=1):
-    # Default interval assumed 5s (matches main.py default)
     if count == 0: return 0
-    return max(1, int((count * interval_seconds) / 60))
+    return (count * interval_seconds) / 60
 
 def normalize_category(cat):
     # Map DB categories to frontend categories
@@ -144,26 +154,48 @@ def recent_activities():
     conn.close()
     
     activities = []
-    # Simple condensing logic:
-    # If same app appears consecutively, it's one session.
-    # But for "recent activities" list, we might just show distinct apps recently used.
+    # Group consecutive same app entries to calculate actual duration
+    if not rows:
+        return jsonify([])
+
+    current_session = None
     
-    seen_apps = set()
+    # We'll use the interval from config if possible
+    interval = 1 
+    try:
+        with open(CONFIG_PATH, 'r') as f:
+            config = json.load(f)
+            interval = config.get('tracking_settings', {}).get('check_interval_seconds', 1)
+    except:
+        pass
+
+    temp_activities = []
     for row in rows:
-        if row['app_name'] not in seen_apps:
-            activities.append({
-                'id': row['timestamp'],
-                'name': row['app_name'],
-                'icon': get_icon_for_app(row['app_name']),
-                'category': normalize_category(row['category']),
-                'duration': 5, 
-                'timestamp': row['timestamp']
-            })
-            seen_apps.add(row['app_name'])
-        if len(activities) >= 8:
-            break
+        app_name = row['app_name']
+        timestamp = row['timestamp']
+        category = normalize_category(row['category'])
+        
+        if not current_session or current_session['name'] != app_name:
+            if current_session:
+                current_session['duration'] = calculate_duration_str(current_session['count'], interval)
+                temp_activities.append(current_session)
             
-    return jsonify(activities)
+            current_session = {
+                'id': timestamp,
+                'name': app_name,
+                'icon': get_icon_for_app(app_name),
+                'category': category,
+                'count': 1,
+                'timestamp': timestamp
+            }
+        else:
+            current_session['count'] += 1
+    
+    if current_session:
+        current_session['duration'] = calculate_duration_str(current_session['count'], interval)
+        temp_activities.append(current_session)
+
+    return jsonify(temp_activities[:8])
 
 @app.route('/api/trends/weekly')
 def weekly_trends():
