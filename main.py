@@ -5,6 +5,7 @@ import psutil
 import win32gui
 import win32process
 from datetime import datetime
+from nudger import SocialPressureNudger
 
 CONFIG_PATH = 'config.json'
 DB_PATH = 'activity.db'
@@ -64,9 +65,29 @@ def main():
     config = load_config()
     check_interval = config['tracking_settings']['check_interval_seconds']
     
+    # Initialize nudger
+    nudger = SocialPressureNudger()
+    last_morning_nudge = None
+    last_evening_nudge = None
+    
     print(f"Tracking every {check_interval} seconds. Press Ctrl+C to stop.")
     
     while True:
+        now = datetime.now()
+        current_date = now.date()
+        current_hour = now.hour
+        
+        # Scheduled reminders
+        # 10 AM Reminder (Morning)
+        if current_hour == 10 and last_morning_nudge != current_date:
+            nudger.show_scheduled_reminder("morning")
+            last_morning_nudge = current_date
+            
+        # 7 PM Reminder (Evening)
+        if current_hour == 19 and last_evening_nudge != current_date:
+            nudger.show_scheduled_reminder("evening")
+            last_evening_nudge = current_date
+
         app_name, window_title = get_active_window_info()
         if app_name:
             category = categorize_activity(app_name, window_title, config)

@@ -113,3 +113,25 @@ Distractions Prevented: {report_data['distractions_prevented']}"""
         except Exception as e:
             print(f"Error showing daily report: {e}")
             return False
+
+    def show_scheduled_reminder(self, reminder_type="morning"):
+        """Show a scheduled reminder for progress updates."""
+        try:
+            if reminder_type == "morning":
+                title = "☀️ Morning Progress Check"
+                message = "Good morning! Time to plan your day. Don't forget to upload your progress later today!"
+            else:
+                title = "🌙 Evening Reflection"
+                message = "Great work today! 🚀 Time to share your wins on LinkedIn or update your progress report."
+
+            notification.notify(
+                title=title,
+                message=message,
+                app_name="Time Waste Detector",
+                timeout=15
+            )
+            print(f"Scheduled reminder ({reminder_type}) shown")
+            return True
+        except Exception as e:
+            print(f"Error showing scheduled reminder: {e}")
+            return False
