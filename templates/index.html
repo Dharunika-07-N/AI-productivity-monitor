@@ -22,61 +22,352 @@
   <link rel="stylesheet" crossorigin href="/assets/index-BQ4vKqCW.css">
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <script>
-    // Listen for milestone nudges and trigger confetti
+    // Milestone & Confetti Logic
     let celebratedMilestones = new Set();
 
     async function checkMilestones() {
       try {
         const response = await fetch('/api/nudges');
         const nudges = await response.json();
-
         const milestone = nudges.find(n => n.type === 'milestone');
         if (milestone && !celebratedMilestones.has(milestone.message)) {
-          console.log("Milestone reached! Triggering confetti...");
           triggerConfetti();
           celebratedMilestones.add(milestone.message);
         }
-      } catch (error) {
-        console.error("Error checking milestones:", error);
-      }
+      } catch (e) { }
     }
 
     function triggerConfetti() {
       const duration = 5 * 1000;
       const animationEnd = Date.now() + duration;
       const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 9999 };
+      const randomInRange = (min, max) => Math.random() * (max - min) + min;
 
-      function randomInRange(min, max) {
-        return Math.random() * (max - min) + min;
-      }
-
-      const interval = setInterval(function () {
+      const interval = setInterval(() => {
         const timeLeft = animationEnd - Date.now();
-
-        if (timeLeft <= 0) {
-          return clearInterval(interval);
-        }
-
+        if (timeLeft <= 0) return clearInterval(interval);
         const particleCount = 50 * (timeLeft / duration);
-        confetti(Object.assign({}, defaults, {
-          particleCount,
-          origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 }
-        }));
-        confetti(Object.assign({}, defaults, {
-          particleCount,
-          origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 }
-        }));
+        confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
+        confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
       }, 250);
     }
 
-    // Check every 10 seconds
     setInterval(checkMilestones, 10000);
+    setInterval(updateNotificationBadge, 5000);
+    updateNotificationBadge(); // Initial call
+
+    // Notification Logic
+    let unreadCount = 0;
+    let allNotifications = [];
+
+    async function updateNotificationBadge() {
+      try {
+        const response = await fetch('/api/nudges');
+        const nudges = await response.json();
+
+        // Use message as unique key for simplicity
+        const newNudges = nudges.filter(n => !allNotifications.find(existing => existing.message === n.message));
+
+        if (newNudges.length > 0) {
+          allNotifications = [...newNudges, ...allNotifications];
+          unreadCount += newNudges.length;
+          renderBadge();
+          renderNotifications();
+        }
+      } catch (e) { }
+    }
+
+    function renderBadge() {
+      const bellBtn = document.querySelector('button:has(.lucide-bell)');
+      if (!bellBtn) return;
+
+      let badge = bellBtn.querySelector('.bell-badge');
+      if (unreadCount > 0) {
+        if (!badge) {
+          badge = document.createElement('span');
+          badge.className = 'bell-badge';
+          bellBtn.appendChild(badge);
+        }
+        badge.innerText = unreadCount > 9 ? '9+' : unreadCount;
+        badge.style.display = 'flex';
+      } else if (badge) {
+        badge.style.display = 'none';
+      }
+    }
+
+    function toggleNotifications(e) {
+      if (e) e.stopPropagation();
+      const dropdown = document.getElementById('notificationDropdown');
+      const isVisible = dropdown.style.display === 'block';
+
+      // Close other modals if any
+      closeGoalModal();
+
+      dropdown.style.display = isVisible ? 'none' : 'block';
+      if (!isVisible) {
+        unreadCount = 0;
+        renderBadge();
+      }
+    }
+
+    function renderNotifications() {
+      const list = document.getElementById('notificationList');
+      if (allNotifications.length === 0) {
+        list.innerHTML = '<div style="padding: 20px; text-align: center; color: #7f849c;">No notifications yet.</div>';
+        return;
+      }
+
+      list.innerHTML = allNotifications.map(n => `
+        <div class="notification-item ${n.type}" style="padding: 12px; border-bottom: 1px solid #313244; transition: background 0.2s;">
+          <div style="display: flex; justify-content: space-between; align-items: start;">
+            <strong style="color: ${getNotificationColor(n.type)}; font-size: 13px;">${n.title}</strong>
+            <span style="font-size: 10px; color: #7f849c;">${n.time}</span>
+          </div>
+          <div style="font-size: 12px; margin-top: 4px; color: #cdd6f4; line-height: 1.4;">${n.message}</div>
+        </div>
+      `).join('');
+    }
+
+    function getNotificationColor(type) {
+      if (type === 'warning') return '#f38ba8';
+      if (type === 'success' || type === 'milestone') return '#a6e3a1';
+      if (type === 'info') return '#89b4fa';
+      return '#cba6f7';
+    }
+
+    // Attach listener to bell button
+    document.addEventListener('click', (e) => {
+      const bellBtn = document.querySelector('button:has(.lucide-bell)');
+      const dropdown = document.getElementById('notificationDropdown');
+
+      if (bellBtn && bellBtn.contains(e.target)) {
+        toggleNotifications(e);
+      } else if (dropdown && !dropdown.contains(e.target)) {
+        dropdown.style.display = 'none';
+      }
+    });
+
+
+    // Goal Management Logic
+    function showGoalModal() {
+      fetchGoalList();
+      document.getElementById('goalModal').style.display = 'flex';
+    }
+
+    function closeGoalModal() {
+      document.getElementById('goalModal').style.display = 'none';
+    }
+
+    async function createGoal() {
+      const title = document.getElementById('goalTitle').value;
+      const deadline = document.getElementById('goalDeadline').value;
+      if (!title || !deadline) return alert("Please fill in both fields.");
+
+      await fetch('/api/goals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, deadline: new Date(deadline).toISOString() })
+      });
+      document.getElementById('goalTitle').value = '';
+      document.getElementById('goalDeadline').value = '';
+      fetchGoalList();
+    }
+
+    async function fetchGoalList() {
+      const resp = await fetch('/api/goals');
+      const goals = await resp.json();
+      const listDiv = document.getElementById('customGoalList');
+      listDiv.innerHTML = '';
+
+      const customGoals = goals.filter(g => g.type === 'custom' && g.status === 'pending');
+      if (customGoals.length === 0) {
+        listDiv.innerHTML = '<p style="color: #7f849c; text-align: center; padding: 20px;">No active custom goals.</p>';
+        return;
+      }
+
+      customGoals.forEach(g => {
+        const item = document.createElement('div');
+        item.className = 'goal-item';
+        item.style = "display: flex; justify-content: space-between; align-items: center; background: #181825; padding: 15px; border-radius: 12px; margin-bottom: 12px; border: 1px solid #313244;";
+        item.innerHTML = `
+          <div>
+            <div style="font-weight: 600; color: #cba6f7;">${g.title}</div>
+            <div style="font-size: 11px; color: #a6adc8; margin-top: 4px;">⏰ ${new Date(g.deadline).toLocaleString()}</div>
+          </div>
+          <button onclick="completeCustomGoal('${g.id}')" style="background: #a6e3a1; color: #11111b; border: none; padding: 8px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; transition: transform 0.2s;">Complete</button>
+        `;
+        listDiv.appendChild(item);
+      });
+    }
+
+    async function completeCustomGoal(id) {
+      const dbId = id.replace('custom_', '');
+      const resp = await fetch(`/api/goals/${dbId}/complete`, { method: 'POST' });
+      if (resp.ok) {
+        alert("Goal Completed! Great job! 🎯");
+        fetchGoalList();
+      }
+    }
   </script>
+  <style>
+    .floating-add-btn {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      width: 60px;
+      height: 60px;
+      background: linear-gradient(135deg, #8b5cf6, #d946ef);
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      cursor: pointer;
+      z-index: 1000;
+      transition: all 0.3s;
+      box-shadow: 0 8px 25px rgba(139, 92, 246, 0.5);
+      border: 2px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .floating-add-btn:hover {
+      transform: scale(1.1) rotate(90deg);
+    }
+
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(17, 17, 27, 0.85);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+      backdrop-filter: blur(8px);
+    }
+
+    .goal-modal {
+      background: #1e1e2e;
+      padding: 30px;
+      border-radius: 20px;
+      width: 450px;
+      border: 1px solid #313244;
+      color: white;
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+
+    .goal-modal h2 {
+      margin-top: 0;
+      color: #cba6f7;
+    }
+
+    .goal-modal input {
+      width: 100%;
+      padding: 12px;
+      margin: 10px 0;
+      background: #181825;
+      border: 1px solid #313244;
+      border-radius: 10px;
+      color: white;
+    }
+
+    .btn-save {
+      width: 100%;
+      padding: 12px;
+      background: #8b5cf6;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: bold;
+      margin-top: 15px;
+    }
+
+    .bell-badge {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      width: 16px;
+      height: 16px;
+      background: #f38ba8;
+      color: #11111b;
+      font-size: 10px;
+      font-weight: bold;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid #1e1e2e;
+      pointer-events: none;
+    }
+
+    .notification-dropdown {
+      position: fixed;
+      top: 70px;
+      right: 20px;
+      width: 320px;
+      max-height: 450px;
+      background: #1e1e2e;
+      border: 1px solid #313244;
+      border-radius: 15px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      display: none;
+      z-index: 3000;
+      overflow: hidden;
+      flex-direction: column;
+    }
+
+    .notification-header {
+      padding: 15px;
+      border-bottom: 1px solid #313244;
+      background: #181825;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .notification-list {
+      overflow-y: auto;
+      flex-grow: 1;
+    }
+
+    .notification-item:hover {
+      background: #313244;
+    }
+  </style>
 </head>
 
 <body>
   <div id="root"></div>
+  <div class="floating-add-btn" onclick="showGoalModal()">+</div>
+  <div id="goalModal" class="modal-overlay">
+    <div class="goal-modal">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2>My Daily Goals</h2>
+        <button onclick="closeGoalModal()"
+          style="background:transparent; border:none; color:#7f849c; font-size:20px; cursor:pointer;">✕</button>
+      </div>
+      <div id="customGoalList"></div>
+      <div style="border-top: 1px solid #313244; margin-top: 25px; padding-top: 20px;">
+        <h3 style="color:#f5c2e7; margin-top:0;">Add New Goal</h3>
+        <input type="text" id="goalTitle" placeholder="Goal Description">
+        <input type="datetime-local" id="goalDeadline">
+        <button class="btn-save" onclick="createGoal()">Set Goal</button>
+      </div>
+    </div>
+  </div>
 
+  <div id="notificationDropdown" class="notification-dropdown">
+    <div class="notification-header">
+      <h3 style="margin:0; font-size:16px; color:#cba6f7;">Notifications</h3>
+    </div>
+    <div id="notificationList" class="notification-list">
+      <!-- Notifications injected here -->
+    </div>
+  </div>
 </body>
 
 </html>

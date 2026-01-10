@@ -4,7 +4,7 @@ import sqlite3
 import psutil
 import win32gui
 import win32process
-from datetime import datetime
+from datetime import datetime, timedelta
 from nudger import SocialPressureNudger
 
 CONFIG_PATH = 'config.json'
@@ -19,6 +19,12 @@ def init_db():
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS activity 
                  (timestamp TEXT, app_name TEXT, window_title TEXT, category TEXT)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS goals 
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT, 
+                  title TEXT, 
+                  deadline TEXT, 
+                  status TEXT, 
+                  created_at TEXT)''')
     conn.commit()
     conn.close()
 
@@ -109,6 +115,31 @@ def main():
                 celebrated_milestones.clear()
         except Exception as e:
             print(f"Error checking milestone: {e}")
+
+        # Check for custom goal deadlines
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute("SELECT * FROM goals WHERE status = 'pending'").fetchall()
+            conn.close()
+            
+            for row in rows:
+                deadline = datetime.fromisoformat(row['deadline'])
+                diff = deadline - now
+                
+                # If deadline is within 1 hour and not yet reminded
+                remind_key = f"remind_{row['id']}_{deadline.strftime('%H%M')}"
+                if timedelta(0) < diff < timedelta(hours=1) and remind_key not in celebrated_milestones:
+                    nudger.show_deadline_reminder(row['title'], f"{int(diff.total_seconds() // 60)} mins")
+                    celebrated_milestones.add(remind_key)
+                
+                # If deadline passed and not yet reminded
+                overdue_key = f"overdue_{row['id']}"
+                if diff < timedelta(0) and overdue_key not in celebrated_milestones:
+                    nudger.show_deadline_reminder(row['title'], "OVERDUE! 🚨")
+                    celebrated_milestones.add(overdue_key)
+        except Exception as e:
+            print(f"Error checking goal deadlines: {e}")
 
         app_name, window_title = get_active_window_info()
         if app_name:

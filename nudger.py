@@ -150,3 +150,18 @@ Distractions Prevented: {report_data['distractions_prevented']}"""
         except Exception as e:
             print(f"Error showing milestone celebration: {e}")
             return False
+
+    def show_deadline_reminder(self, task_title, time_left_str):
+        """Show a reminder for an upcoming deadline."""
+        try:
+            notification.notify(
+                title="⚠️ Deadline Approaching!",
+                message=f"Task: {task_title}\nTime left: {time_left_str}\nLet's get it finished! 💪",
+                app_name="Time Waste Detector",
+                timeout=20
+            )
+            print(f"Deadline reminder shown for: {task_title}")
+            return True
+        except Exception as e:
+            print(f"Error showing deadline reminder: {e}")
+            return False

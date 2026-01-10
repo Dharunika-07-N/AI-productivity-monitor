@@ -240,15 +240,44 @@ def get_nudges():
         
     return jsonify(nudges)
 
-@app.route('/api/goals')
-def get_goals():
+@app.route('/api/goals', methods=['GET', 'POST'])
+def handle_goals():
+    if request.method == 'POST':
+        data = request.json
+        title = data.get('title')
+        deadline = data.get('deadline') # ISO format expected
+        
+        conn = get_db_connection()
+        conn.execute("INSERT INTO goals (title, deadline, status, created_at) VALUES (?, ?, ?, ?)",
+                     (title, deadline, 'pending', datetime.now().isoformat()))
+        conn.commit()
+        conn.close()
+        return jsonify({'status': 'success'})
+
+    # GET logic
+    conn = get_db_connection()
+    rows = conn.execute("SELECT * FROM goals ORDER BY created_at DESC").fetchall()
+    conn.close()
+    
     calculator = get_calculator()
     stats = calculator.get_productivity_stats()
-    
     productive_mins = stats['productive']['minutes']
     distracting_mins = stats['time_wasting']['minutes']
     
-    goals = [
+    # Custom goals from DB
+    custom_goals = []
+    for row in rows:
+        custom_goals.append({
+            'id': f"custom_{row['id']}",
+            'title': row['title'],
+            'type': 'custom',
+            'deadline': row['deadline'],
+            'status': row['status'],
+            'icon': 'Flag' if row['status'] == 'pending' else 'CheckCircle'
+        })
+    
+    # System automated goals
+    system_goals = [
         {
             'id': '1', 
             'title': 'Deep Work Master', 
@@ -257,15 +286,6 @@ def get_goals():
             'currentMinutes': productive_mins, 
             'category': 'productive',
             'icon': 'Zap'
-        },
-        {
-            'id': '2', 
-            'title': 'Focus Sprint', 
-            'type': 'daily', 
-            'targetMinutes': 30, 
-            'currentMinutes': min(30, productive_mins), 
-            'category': 'productive',
-            'icon': 'Target'
         },
         {
             'id': '3', 
@@ -277,7 +297,15 @@ def get_goals():
             'icon': 'Shield'
         }
     ]
-    return jsonify(goals)
+    return jsonify(system_goals + custom_goals)
+
+@app.route('/api/goals/<int:goal_id>/complete', methods=['POST'])
+def complete_goal(goal_id):
+    conn = get_db_connection()
+    conn.execute("UPDATE goals SET status = 'completed' WHERE id = ?", (goal_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({'status': 'success'})
 
 # New endpoint for top apps
 @app.route('/api/stats/top-apps')
