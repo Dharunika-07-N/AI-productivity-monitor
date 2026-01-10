@@ -69,6 +69,7 @@ def main():
     nudger = SocialPressureNudger()
     last_morning_nudge = None
     last_evening_nudge = None
+    celebrated_milestones = set()
     
     print(f"Tracking every {check_interval} seconds. Press Ctrl+C to stop.")
     
@@ -87,6 +88,27 @@ def main():
         if current_hour == 19 and last_evening_nudge != current_date:
             nudger.show_scheduled_reminder("evening")
             last_evening_nudge = current_date
+
+        # Check for 30 minute productivity milestone
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            today_start = now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+            query = "SELECT COUNT(*) FROM activity WHERE timestamp > ? AND category = 'productive'"
+            productive_count = conn.execute(query, (today_start,)).fetchone()[0]
+            conn.close()
+            
+            productive_minutes = productive_count * (check_interval / 60)
+            
+            # Trigger celebration at 30 minutes
+            if productive_minutes >= 30 and "30_min" not in celebrated_milestones:
+                nudger.show_milestone_celebration("30 minutes")
+                celebrated_milestones.add("30_min")
+            
+            # Reset milestones for next day
+            if now.hour == 0 and now.minute == 0:
+                celebrated_milestones.clear()
+        except Exception as e:
+            print(f"Error checking milestone: {e}")
 
         app_name, window_title = get_active_window_info()
         if app_name:

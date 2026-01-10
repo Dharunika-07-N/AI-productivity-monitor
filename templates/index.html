@@ -20,6 +20,58 @@
   <meta name="twitter:image" content="/static/logo.png" />
   <script type="module" crossorigin src="/assets/index-DvJ-6ZGw.js"></script>
   <link rel="stylesheet" crossorigin href="/assets/index-BQ4vKqCW.css">
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <script>
+    // Listen for milestone nudges and trigger confetti
+    let celebratedMilestones = new Set();
+
+    async function checkMilestones() {
+      try {
+        const response = await fetch('/api/nudges');
+        const nudges = await response.json();
+
+        const milestone = nudges.find(n => n.type === 'milestone');
+        if (milestone && !celebratedMilestones.has(milestone.message)) {
+          console.log("Milestone reached! Triggering confetti...");
+          triggerConfetti();
+          celebratedMilestones.add(milestone.message);
+        }
+      } catch (error) {
+        console.error("Error checking milestones:", error);
+      }
+    }
+
+    function triggerConfetti() {
+      const duration = 5 * 1000;
+      const animationEnd = Date.now() + duration;
+      const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 9999 };
+
+      function randomInRange(min, max) {
+        return Math.random() * (max - min) + min;
+      }
+
+      const interval = setInterval(function () {
+        const timeLeft = animationEnd - Date.now();
+
+        if (timeLeft <= 0) {
+          return clearInterval(interval);
+        }
+
+        const particleCount = 50 * (timeLeft / duration);
+        confetti(Object.assign({}, defaults, {
+          particleCount,
+          origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 }
+        }));
+        confetti(Object.assign({}, defaults, {
+          particleCount,
+          origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 }
+        }));
+      }, 250);
+    }
+
+    // Check every 10 seconds
+    setInterval(checkMilestones, 10000);
+  </script>
 </head>
 
 <body>

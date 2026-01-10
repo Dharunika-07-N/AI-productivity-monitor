@@ -171,7 +171,7 @@ class NudgeEngine:
         }
     
     def check_for_encouragement(self):
-        """Check if user deserves encouragement"""
+        """Check if user deserves encouragement or reached a milestone"""
         conn = self.get_connection()
         
         # Get today's productive activities
@@ -189,7 +189,17 @@ class NudgeEngine:
         productive_count = result['count'] if result else 0
         productive_minutes = productive_count * 5
         
-        # Show encouragement if user has been productive for 2+ hours
+        # Check for 30 minute milestone specifically
+        if 30 <= productive_minutes < 35: # Within the first 5 mins of hitting 30 mins
+             return {
+                'type': 'milestone',
+                'title': 'Focused Sprint! 🥈',
+                'message': "You've been productive for a solid 30 minutes! Keep that momentum going! 🎉",
+                'time': datetime.now().strftime('%I:%M %p').lower(),
+                'action': 'confetti'
+            }
+
+        # Regular encouragement for 2+ hours
         if productive_minutes >= 120:
             template = random.choice(self.encouragements)
             message = template.format(duration=f"{productive_minutes // 60} hours")

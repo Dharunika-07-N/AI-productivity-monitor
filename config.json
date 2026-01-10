@@ -24,6 +24,22 @@
       {
         "app": "chrome.exe",
         "site": "developer.mozilla.org"
+      },
+      {
+        "app": "chrome.exe",
+        "site": "leetcode.com"
+      },
+      {
+        "app": "chrome.exe",
+        "site": "hackerrank.com"
+      },
+      {
+        "app": "chrome.exe",
+        "site": "geeksforgeeks.org"
+      },
+      {
+        "app": "chrome.exe",
+        "site": "codechef.com"
       }
     ],
     "neutral": [

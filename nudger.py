@@ -135,3 +135,18 @@ Distractions Prevented: {report_data['distractions_prevented']}"""
         except Exception as e:
             print(f"Error showing scheduled reminder: {e}")
             return False
+
+    def show_milestone_celebration(self, milestone_name="1 hour"):
+        """Show a celebratory notification for reaching a productivity milestone."""
+        try:
+            notification.notify(
+                title="🏆 Achievement Unlocked!",
+                message=f"Spectacular! You've been productive for {milestone_name}. You're in the zone! 🚀",
+                app_name="Time Waste Detector",
+                timeout=20
+            )
+            print(f"Milestone ({milestone_name}) celebration shown")
+            return True
+        except Exception as e:
+            print(f"Error showing milestone celebration: {e}")
+            return False
