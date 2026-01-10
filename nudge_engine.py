@@ -10,6 +10,17 @@ import random
 class NudgeEngine:
     def __init__(self, db_path='activity.db'):
         self.db_path = db_path
+        self.config_path = 'config.json'
+        self.check_interval = self._load_interval()
+        
+    def _load_interval(self):
+        try:
+            import json
+            with open(self.config_path, 'r') as f:
+                config = json.load(f)
+                return config.get('tracking_settings', {}).get('check_interval_seconds', 1)
+        except:
+            return 1
         
         # Nudge thresholds
         self.time_wasting_threshold = 15  # minutes
@@ -101,8 +112,8 @@ class NudgeEngine:
         nudges = []
         
         for row in results:
-            # Each activity entry ≈ 5 minutes
-            duration = row['frequency'] * 5
+            # Calculate actual duration based on log interval
+            duration = round((row['frequency'] * self.check_interval) / 60, 1)
             
             if duration >= self.time_wasting_threshold:
                 template = random.choice(self.time_check_templates)
@@ -142,7 +153,7 @@ class NudgeEngine:
             return None
         
         # Calculate duration
-        productive_minutes = result['count'] * 5
+        productive_minutes = round((result['count'] * self.check_interval) / 60, 1)
         
         if productive_minutes >= self.break_reminder_interval:
             template = random.choice(self.break_reminders)
@@ -187,7 +198,7 @@ class NudgeEngine:
         conn.close()
         
         productive_count = result['count'] if result else 0
-        productive_minutes = productive_count * 5
+        productive_minutes = round((productive_count * self.check_interval) / 60, 1)
         
         # Check for 30 minute milestone specifically
         if 30 <= productive_minutes < 35: # Within the first 5 mins of hitting 30 mins

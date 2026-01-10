@@ -19,6 +19,17 @@ class FocusScoreCalculator:
         
         # Time-based multipliers (more recent = more weight)
         self.time_decay = 0.9  # Each hour back reduces weight by 10%
+        self.config_path = 'config.json'
+        self.check_interval = self._load_interval()
+    
+    def _load_interval(self):
+        try:
+            import json
+            with open(self.config_path, 'r') as f:
+                config = json.load(f)
+                return config.get('tracking_settings', {}).get('check_interval_seconds', 1)
+        except:
+            return 1
     
     def get_connection(self):
         conn = sqlite3.connect(self.db_path)
@@ -26,44 +37,9 @@ class FocusScoreCalculator:
         return conn
     
     def calculate_current_score(self):
-        """Calculate focus score for today"""
-        conn = self.get_connection()
-        today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
-        
-        query = """
-        SELECT category, COUNT(*) as count, MAX(timestamp) as last_seen
-        FROM activity 
-        WHERE timestamp > ?
-        GROUP BY category
-        """
-        
-        results = conn.execute(query, (today,)).fetchall()
-        conn.close()
-        
-        if not results:
-            return 0
-        
-        # Calculate weighted score
-        total_weight = 0
-        total_score = 0
-        
-        for row in results:
-            category = row['category']
-            count = row['count']
-            
-            # Apply category weight
-            category_weight = self.weights.get(category, 50)
-            score_contribution = count * category_weight
-            
-            total_score += score_contribution
-            total_weight += count * 100  # Maximum possible weight
-        
-        # Normalize to 0-100
-        if total_weight == 0:
-            return 0
-        
-        final_score = round((total_score / total_weight) * 100)
-        return max(0, min(100, final_score))
+        """Calculate focus score for today using the day score method"""
+        stats = self.calculate_day_score(datetime.now())
+        return stats['score']
     
     def calculate_weekly_average(self):
         """Calculate average focus score for the week"""
@@ -71,13 +47,13 @@ class FocusScoreCalculator:
         
         for i in range(7):
             day = datetime.now() - timedelta(days=i)
-            score = self.calculate_day_score(day)
-            scores.append(score)
+            day_stats = self.calculate_day_score(day)
+            scores.append(day_stats['score'])
         
         return round(sum(scores) / len(scores)) if scores else 0
     
     def calculate_day_score(self, date):
-        """Calculate focus score for a specific day"""
+        """Calculate detailed focus stats for a specific day"""
         conn = self.get_connection()
         
         day_start = date.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
@@ -93,8 +69,15 @@ class FocusScoreCalculator:
         results = conn.execute(query, (day_start, day_end)).fetchall()
         conn.close()
         
+        stats = {
+            'score': 0,
+            'productive_mins': 0,
+            'neutral_mins': 0,
+            'distracting_mins': 0
+        }
+        
         if not results:
-            return 0
+            return stats
         
         total_weight = 0
         total_score = 0
@@ -102,30 +85,35 @@ class FocusScoreCalculator:
         for row in results:
             category = row['category']
             count = row['count']
+            mins = round((count * self.check_interval) / 60, 1)
+            
+            if category == 'productive': stats['productive_mins'] = mins
+            elif category == 'neutral': stats['neutral_mins'] = mins
+            else: stats['distracting_mins'] = mins
             
             category_weight = self.weights.get(category, 50)
-            score_contribution = count * category_weight
-            
-            total_score += score_contribution
+            total_score += count * category_weight
             total_weight += count * 100
         
-        if total_weight == 0:
-            return 0
-        
-        final_score = round((total_score / total_weight) * 100)
-        return max(0, min(100, final_score))
+        if total_weight > 0:
+            stats['score'] = round((total_score / total_weight) * 100)
+            
+        return stats
     
     def get_score_trend(self, days=7):
-        """Get focus score trend for the last N days"""
+        """Get focus score trend for the last N days with breakdown"""
         trend = []
         
         for i in range(days - 1, -1, -1):
             day = datetime.now() - timedelta(days=i)
-            score = self.calculate_day_score(day)
+            day_stats = self.calculate_day_score(day)
             trend.append({
                 'date': day.strftime('%Y-%m-%d'),
                 'day_name': day.strftime('%a'),
-                'score': score
+                'score': day_stats['score'],
+                'productive': day_stats['productive_mins'],
+                'neutral': day_stats['neutral_mins'],
+                'distracting': day_stats['distracting_mins']
             })
         
         return trend
@@ -138,8 +126,7 @@ class FocusScoreCalculator:
         query = """
         SELECT 
             category,
-            COUNT(*) as count,
-            COUNT(*) * 5 as estimated_minutes
+            COUNT(*) as count
         FROM activity 
         WHERE timestamp > ?
         GROUP BY category
@@ -158,7 +145,7 @@ class FocusScoreCalculator:
             category = row['category']
             if category in stats:
                 stats[category]['count'] = row['count']
-                stats[category]['minutes'] = row['estimated_minutes']
+                stats[category]['minutes'] = round((row['count'] * self.check_interval) / 60, 1)
         
         total_minutes = sum(s['minutes'] for s in stats.values())
         
@@ -184,6 +171,21 @@ class FocusScoreCalculator:
             'difference': difference,
             'trend': 'up' if difference > 0 else 'down' if difference < 0 else 'same'
         }
+
+    def calculate_focus_streak(self):
+        """Calculate the current focus streak in days"""
+        streak = 0
+        current_date = datetime.now()
+        
+        while True:
+            score = self.calculate_day_score(current_date)
+            # Consider a day part of a streak if score > 30
+            if score >= 30:
+                streak += 1
+                current_date -= timedelta(days=1)
+            else:
+                break
+        return max(1, streak)
 
 # Singleton instance
 _calculator = None

@@ -106,14 +106,16 @@ def user_progress():
     
     comparison = calculator.get_score_comparison()
     
+    streak = calculator.calculate_focus_streak()
+    
     return jsonify({
         'level': level,
         'currentXP': total_xp % 1000,
         'nextLevelXP': 1000,
         'totalXP': total_xp,
         'title': 'Focus Novice' if level < 5 else 'Focus Master',
-        'streak': 1, # TODO: Get real streak from analyzer
-        'longestStreak': 1,
+        'streak': streak,
+        'longestStreak': streak,
         'focusScore': comparison['today'],
         'scoreComparison': comparison
     })
@@ -221,9 +223,9 @@ def weekly_trends():
             'date': day['day_name'],
             'focusScore': day['score'],
             # These are for the stacked area chart
-            'productiveMinutes': 0, # Could be added if we expand calculator
-            'neutralMinutes': 0,
-            'distractingMinutes': 0
+            'productiveMinutes': day['productive'],
+            'neutralMinutes': day['neutral'],
+            'distractingMinutes': day['distracting']
         })
     
     return jsonify(formatted_trend)
